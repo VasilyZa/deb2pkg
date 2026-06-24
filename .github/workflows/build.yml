@@ -1,4 +1,4 @@
-name: "Build Static Musl Package"
+name: Build Static Musl Package
 
 on:
   workflow_dispatch:
