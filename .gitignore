@@ -1,0 +1,30 @@
+# 编译产物
+build/
+build_static/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试输出
+sl-bin/
+google-chrome-stable-bin/
+
+# 包文件
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.deb
+*.rpm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CMake 缓存
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
