@@ -1,128 +1,100 @@
-name: Build Static Musl Package
+name: "Build Static Musl Package"
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.0.3)'
+        description: "Version tag (e.g. v1.0.3)"
         required: false
-        default: ''
+        default: ""
 
 jobs:
   build:
+    name: "Build static musl binary and Arch package"
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest
-      options: --privileged
 
     steps:
-      - name: Install build dependencies
+      - name: "Install build dependencies"
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm \
             clang cmake make binutils musl libarchive \
             pkgconf git curl zstd xz bzip2 zlib \
-            base-devel fakeroot sudo
+            base-devel fakeroot sudo patch
 
-      - name: Checkout code
+      - name: "Checkout code"
         uses: actions/checkout@v4
 
-      - name: Build static dependencies
+      - name: "Build static dependencies"
         run: |
           set -e
-          SCRIPT_DIR="$PWD"
-          STATIC_DIR="$PWD/build_static/static_libs"
-          SRC_DIR="$PWD/build_static/src"
+          STATIC_DIR="$GITHUB_WORKSPACE/build_static/static_libs"
+          SRC_DIR="$GITHUB_WORKSPACE/build_static/src"
           JOBS=$(nproc)
           mkdir -p "$STATIC_DIR/lib" "$STATIC_DIR/include" "$SRC_DIR"
 
-          # ---- 1. zlib ----
-          echo "[1/6] Building zlib..."
+          echo "[1/6] zlib..."
           cd "$SRC_DIR"
-          ZLIB_VER=1.3.1
-          curl -sL "https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VER}.tar.gz" -o zlib.tar.gz
-          tar xzf zlib.tar.gz
-          cd "zlib-${ZLIB_VER}"
+          curl -sL "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz" -o zlib.tar.gz
+          tar xzf zlib.tar.gz && cd zlib-1.3.1
           CFLAGS="-O2 -fPIC" ./configure --static --prefix="$STATIC_DIR"
           make -j$JOBS && make install
 
-          # ---- 2. bzip2 ----
-          echo "[2/6] Building bzip2..."
+          echo "[2/6] bzip2..."
           cd "$SRC_DIR"
-          BZIP2_VER=1.0.8
-          curl -sL "https://sourceware.org/pub/bzip2/bzip2-${BZIP2_VER}.tar.gz" -o bzip2.tar.gz
-          tar xzf bzip2.tar.gz
-          cd "bzip2-${BZIP2_VER}"
+          curl -sL "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz" -o bzip2.tar.gz
+          tar xzf bzip2.tar.gz && cd bzip2-1.0.8
           make -j$JOBS CFLAGS="-O2 -fPIC" libbz2.a
-          cp libbz2.a "$STATIC_DIR/lib/"
-          cp bzlib.h "$STATIC_DIR/include/"
+          cp libbz2.a "$STATIC_DIR/lib/" && cp bzlib.h "$STATIC_DIR/include/"
 
-          # ---- 3. xz ----
-          echo "[3/6] Building xz..."
+          echo "[3/6] xz..."
           cd "$SRC_DIR"
-          XZ_VER=5.6.4
-          curl -sL "https://github.com/tukaani-project/xz/releases/download/v${XZ_VER}/xz-${XZ_VER}.tar.gz" -o xz.tar.gz
-          tar xzf xz.tar.gz
-          cd "xz-${XZ_VER}"
+          curl -sL "https://github.com/tukaani-project/xz/releases/download/v5.6.4/xz-5.6.4.tar.gz" -o xz.tar.gz
+          tar xzf xz.tar.gz && cd xz-5.6.4
           ./configure --prefix="$STATIC_DIR" --disable-shared --enable-static \
               --disable-xz --disable-xzdec --disable-lzmadec --disable-lzmainfo \
               --disable-lzma-links --disable-scripts --disable-doc
           make -j$JOBS && make install
 
-          # ---- 4. zstd ----
-          echo "[4/6] Building zstd..."
+          echo "[4/6] zstd..."
           cd "$SRC_DIR"
-          ZSTD_VER=1.5.6
-          curl -sL "https://github.com/facebook/zstd/releases/download/v${ZSTD_VER}/zstd-${ZSTD_VER}.tar.gz" -o zstd.tar.gz
-          tar xzf zstd.tar.gz
-          cd "zstd-${ZSTD_VER}/lib"
+          curl -sL "https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz" -o zstd.tar.gz
+          tar xzf zstd.tar.gz && cd zstd-1.5.6/lib
           make -j$JOBS CFLAGS="-O2 -fPIC" libzstd.a
-          cp libzstd.a "$STATIC_DIR/lib/"
-          cp zstd.h zdict.h zstd_errors.h "$STATIC_DIR/include/"
+          cp libzstd.a "$STATIC_DIR/lib/" && cp zstd.h zdict.h zstd_errors.h "$STATIC_DIR/include/"
 
-          # ---- 5. libarchive ----
-          echo "[5/6] Building libarchive..."
+          echo "[5/6] libarchive..."
           cd "$SRC_DIR"
-          LA_VER=3.8.7
-          curl -sL "https://github.com/libarchive/libarchive/releases/download/v${LA_VER}/libarchive-${LA_VER}.tar.gz" -o libarchive.tar.gz
-          tar xzf libarchive.tar.gz
-          cd "libarchive-${LA_VER}"
+          curl -sL "https://github.com/libarchive/libarchive/releases/download/v3.8.7/libarchive-3.8.7.tar.gz" -o libarchive.tar.gz
+          tar xzf libarchive.tar.gz && cd libarchive-3.8.7
           cmake . \
               -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
               -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_SHARED_LIBS=OFF \
-              -DENABLE_LZ4=OFF \
-              -DENABLE_LZO=OFF \
-              -DENABLE_NETTLE=OFF \
-              -DENABLE_OPENSSL=OFF \
-              -DENABLE_LIBXML2=OFF \
-              -DENABLE_EXPAT=OFF \
-              -DENABLE_PCREPOSIX=OFF \
-              -DENABLE_LibGCC=OFF \
-              -DENABLE_CNG=OFF \
-              -DENABLE_ACL=OFF \
-              -DENABLE_XATTR=OFF \
-              -DENABLE_TAR=ON \
-              -DENABLE_CPIO=ON \
-              -DENABLE_CAT=OFF \
-              -DENABLE_TEST=OFF \
+              -DENABLE_LZ4=OFF -DENABLE_LZO=OFF \
+              -DENABLE_NETTLE=OFF -DENABLE_OPENSSL=OFF \
+              -DENABLE_LIBXML2=OFF -DENABLE_EXPAT=OFF \
+              -DENABLE_PCREPOSIX=OFF -DENABLE_LibGCC=OFF \
+              -DENABLE_CNG=OFF -DENABLE_ACL=OFF -DENABLE_XATTR=OFF \
+              -DENABLE_TAR=ON -DENABLE_CPIO=ON \
+              -DENABLE_CAT=OFF -DENABLE_TEST=OFF \
               -DCMAKE_INSTALL_PREFIX="$STATIC_DIR" \
               -DCMAKE_PREFIX_PATH="$STATIC_DIR"
           make -j$JOBS && make install
 
-      - name: Build musl compat layer
-        run: |
+          echo "[6/6] musl compat..."
           cd "$GITHUB_WORKSPACE/src/core"
           clang --target=x86_64-linux-musl -O2 -c musl_compat.c \
-            -o "$GITHUB_WORKSPACE/build_static/static_libs/lib/musl_compat.o"
-          cd "$GITHUB_WORKSPACE/build_static/static_libs/lib"
-          ar rcs libmuslcompat.a musl_compat.o
+            -o "$STATIC_DIR/lib/musl_compat.o"
+          cd "$STATIC_DIR/lib" && ar rcs libmuslcompat.a musl_compat.o
 
-      - name: Build deb2pkg (static musl)
+      - name: "Build deb2pkg (static musl)"
         run: |
           set -e
-          STATIC_DIR="$PWD/build_static/static_libs"
-          BUILD_DIR="$PWD/build_static/build"
+          STATIC_DIR="$GITHUB_WORKSPACE/build_static/static_libs"
+          BUILD_DIR="$GITHUB_WORKSPACE/build_static/build"
           rm -rf "$BUILD_DIR" && mkdir -p "$BUILD_DIR" && cd "$BUILD_DIR"
 
           CC=clang CXX=clang++ cmake "$GITHUB_WORKSPACE" \
@@ -131,81 +103,82 @@ jobs:
               -DCMAKE_CXX_STANDARD=17 \
               -DCMAKE_PREFIX_PATH="$STATIC_DIR"
 
-          make -j$(nproc) VERBOSE=1
+          make -j$(nproc)
 
           echo "=== Binary info ==="
           file "$BUILD_DIR/deb2pkg"
           ldd "$BUILD_DIR/deb2pkg" 2>&1 || true
 
-      - name: Prepare PKGBUILD for deb2pkg
+          # Ensure executable
+          chmod +x "$BUILD_DIR/deb2pkg"
+
+          # Quick smoke test
+          "$BUILD_DIR/deb2pkg" --help 2>&1 || true
+
+      - name: "Package as Arch Linux .pkg.tar.zst"
         run: |
-          BUILD_DIR="$PWD/build_static/build"
-          VERSION=$(date +%Y%m%d)
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          set -e
+          BUILD_DIR="$GITHUB_WORKSPACE/build_static/build"
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="$(date +%Y%m%d)"
           fi
 
-          mkdir -p /tmp/pkgbuild/deb2pkg
+          PKG_DIR="/tmp/pkgbuild/deb2pkg"
+          rm -rf "$PKG_DIR" && mkdir -p "$PKG_DIR"
 
           # Copy binary
-          cp "$BUILD_DIR/deb2pkg" /tmp/pkgbuild/deb2pkg/
+          cp "$BUILD_DIR/deb2pkg" "$PKG_DIR/"
+          chmod 755 "$PKG_DIR/deb2pkg"
 
           # Create PKGBUILD
-          cat > /tmp/pkgbuild/deb2pkg/PKGBUILD << 'PKGBUILDEOF'
+          cat > "$PKG_DIR/PKGBUILD" << PKGBUILDEOF
   pkgname=deb2pkg
-  pkgver=__VERSION__
+  pkgver=$VERSION
   pkgrel=1
   pkgdesc="Convert .deb/.rpm packages to Arch Linux PKGBUILD (statically linked with musl)"
   arch=(x86_64)
   license=(MIT)
   url="https://github.com/VasilyZa/deb2pkg"
-  depends=()
-  makedepends=()
+  options=(!strip)
   source=()
   sha256sums=('SKIP')
-  options=(!strip)
 
   package() {
-    install -Dm755 "$srcdir/deb2pkg" "$pkgdir/usr/bin/deb2pkg"
+    install -Dm755 "\$srcdir/deb2pkg" "\$pkgdir/usr/bin/deb2pkg"
   }
   PKGBUILDEOF
 
-          sed -i "s/__VERSION__/$VERSION/" /tmp/pkgbuild/deb2pkg/PKGBUILD
+          # Fix indentation (heredoc adds leading spaces)
+          sed -i 's/^  //' "$PKG_DIR/PKGBUILD"
 
-          echo "PKGBUILD ready. Version: $VERSION"
-
-      - name: Build Arch package
-        run: |
-          cd /tmp/pkgbuild/deb2pkg
-
-          # Create a non-root build user (makepkg refuses to run as root)
-          useradd -m builder
+          # Create build user (makepkg refuses to run as root)
+          useradd -m builder 2>/dev/null || true
           chown -R builder:builder /tmp/pkgbuild
 
-          # Run makepkg as builder user
-          su builder -c "cd /tmp/pkgbuild/deb2pkg && makepkg -sf --noconfirm"
+          echo "Building package..."
+          su builder -c "cd $PKG_DIR && makepkg -sf --noconfirm"
 
-          # Find the built package
-          PKG_FILE=$(ls /tmp/pkgbuild/deb2pkg/deb2pkg-*.pkg.tar.zst 2>/dev/null || ls /tmp/pkgbuild/deb2pkg/deb2pkg-*.pkg.tar.* 2>/dev/null)
+          # Find and copy the package
+          PKG_FILE=$(ls "$PKG_DIR"/deb2pkg-*.pkg.tar.* 2>/dev/null | head -1)
           if [ -z "$PKG_FILE" ]; then
-            echo "Package file not found, listing directory:"
-            ls -la /tmp/pkgbuild/deb2pkg/
+            echo "ERROR: Package file not found!"
+            ls -la "$PKG_DIR/"
             exit 1
           fi
+
           cp "$PKG_FILE" "$GITHUB_WORKSPACE/"
           echo "PACKAGE_FILE=$(basename "$PKG_FILE")" >> "$GITHUB_ENV"
-          # Also set version for release tag
-          V=$(echo "$PKG_FILE" | grep -oP 'deb2pkg-\K[0-9.]+(?=-)')
-          echo "PKG_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Built: $(basename "$PKG_FILE")"
 
-      - name: Upload artifact
+      - name: "Upload Arch package artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: deb2pkg-arch-package
+          name: deb2pkg-musl-static
           path: "${{ env.PACKAGE_FILE }}"
           retention-days: 90
 
-      - name: Create GitHub Release
+      - name: "Create GitHub Release"
         if: github.event.inputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
@@ -214,11 +187,3 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Summary
-        run: |
-          echo "========================================="
-          echo "  Build Complete!"
-          echo "  Package: ${{ env.PACKAGE_FILE }}"
-          echo "  Version: ${{ env.PKG_VERSION }}"
-          echo "========================================="
