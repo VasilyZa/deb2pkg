@@ -33,6 +33,7 @@ set(SOURCES
     src/main.cpp
     src/core/logger.cpp
     src/core/executor.cpp
+    src/core/i18n.cpp
     src/extract/archive_reader.cpp
     src/extract/deb_extractor.cpp
     src/extract/rpm_extractor.cpp
