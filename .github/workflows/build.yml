@@ -132,25 +132,23 @@ jobs:
           chmod 755 "$PKG_DIR/deb2pkg"
 
           # Create PKGBUILD
-          cat > "$PKG_DIR/PKGBUILD" << PKGBUILDEOF
-  pkgname=deb2pkg
-  pkgver=$VERSION
-  pkgrel=1
-  pkgdesc="Convert .deb/.rpm packages to Arch Linux PKGBUILD (statically linked with musl)"
-  arch=(x86_64)
-  license=(MIT)
-  url="https://github.com/VasilyZa/deb2pkg"
-  options=(!strip)
-  source=()
-  sha256sums=('SKIP')
+          cat > "$PKG_DIR/PKGBUILD" << 'PKGBUILDEOF'
+pkgname=deb2pkg
+pkgver=__VERSION__
+pkgrel=1
+pkgdesc="Convert .deb/.rpm packages to Arch Linux PKGBUILD (statically linked with musl)"
+arch=(x86_64)
+license=(MIT)
+url="https://github.com/VasilyZa/deb2pkg"
+options=(!strip)
+source=()
+sha256sums=('SKIP')
 
-  package() {
-    install -Dm755 "\$srcdir/deb2pkg" "\$pkgdir/usr/bin/deb2pkg"
-  }
-  PKGBUILDEOF
-
-          # Fix indentation (heredoc adds leading spaces)
-          sed -i 's/^  //' "$PKG_DIR/PKGBUILD"
+package() {
+  install -Dm755 "$srcdir/deb2pkg" "$pkgdir/usr/bin/deb2pkg"
+}
+PKGBUILDEOF
+          sed -i "s/__VERSION__/$VERSION/" "$PKG_DIR/PKGBUILD"
 
           # Create build user (makepkg refuses to run as root)
           useradd -m builder 2>/dev/null || true
