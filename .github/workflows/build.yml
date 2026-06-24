@@ -99,7 +99,7 @@ jobs:
 
           CC=clang CXX=clang++ cmake "$GITHUB_WORKSPACE" \
               -DCMAKE_CXX_FLAGS="--target=x86_64-linux-musl -O2 -Wall -Wextra -pedantic" \
-              -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib/musl/lib -L${STATIC_DIR}/lib -static -lmuslcompat -larchive -lz -lbz2 -llzma -lzstd" \
+              -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib/musl/lib -L${STATIC_DIR}/lib -static -Wl,--whole-archive -lmuslcompat -Wl,--no-whole-archive -larchive -lz -lbz2 -llzma -lzstd" \
               -DCMAKE_CXX_STANDARD=17 \
               -DCMAKE_PREFIX_PATH="$STATIC_DIR"
 
