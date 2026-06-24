@@ -1,3 +1,6 @@
+# GitHub
+!.github/
+
 # 编译产物
 build/
 build_static/
